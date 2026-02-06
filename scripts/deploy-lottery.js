@@ -1,13 +1,13 @@
 /**
- * 部署 DriftLottery 抽奖引擎合约
+ * 部署 DriftLottery 抽奖引擎合约（v2 - WBNB 奖池版）
  *
  * 使用方式：
- *   npx hardhat run scripts/deploy-lottery.js --network bscTestnet
+ *   npx hardhat run scripts/deploy-lottery.js --network bsc
  *
  * 部署流程：
- *   1. 部署 DriftLottery 合约
- *   2. 在 flap.sh 创建代币，税收接收地址填写此合约地址
- *   3. 调用 setToken() 设置 flap.sh 代币地址
+ *   1. 部署 DriftLottery 合约（构造函数传入 marketingWallet + WBNB 地址）
+ *   2. 在 flap.sh 创建代币，taxSplitter 设为此合约地址
+ *   3. 调用 setToken() 设置 flap.sh 代币地址（用于持仓检查）
  *   4. 调用 setKeeper() 设置 keeper 地址
  *   5. 启动 keeper 脚本
  */
@@ -18,7 +18,7 @@ async function main() {
   const [deployer] = await hre.ethers.getSigners();
 
   console.log("========================================");
-  console.log("  DriftLottery 部署脚本");
+  console.log("  DriftLottery v3 部署脚本（原生 BNB 奖池）");
   console.log("========================================");
   console.log("部署者地址:", deployer.address);
   console.log("账户余额:", hre.ethers.formatEther(await hre.ethers.provider.getBalance(deployer.address)), "BNB");
@@ -28,7 +28,7 @@ async function main() {
   const MARKETING_WALLET = deployer.address; // 营销钱包（可后续修改）
 
   // ====== 部署 ======
-  console.log("正在部署 DriftLottery...");
+  console.log("正在部署 DriftLottery v3...");
 
   const DriftLottery = await hre.ethers.getContractFactory("DriftLottery");
   const lottery = await DriftLottery.deploy(MARKETING_WALLET);
@@ -45,10 +45,10 @@ async function main() {
   console.log("");
   console.log("1️⃣  去 flap.sh 创建代币：");
   console.log("   - 税率: 3%");
-  console.log("   - 税收分配: 资金接收钱包 100%");
-  console.log("   - Recipient Wallet:", lotteryAddress);
+  console.log("   - taxSplitter 地址设为此合约:", lotteryAddress);
+  console.log("   ⚠️  注意: flap.sh 会将税收换成 WBNB 发给 taxSplitter");
   console.log("");
-  console.log("2️⃣  代币创建后，调用 setToken()：");
+  console.log("2️⃣  代币创建后，调用 setToken()（用于持仓检查）：");
   console.log(`   await lottery.setToken("FLAP_TOKEN_ADDRESS")`);
   console.log("");
   console.log("3️⃣  设置 Keeper 地址：");
@@ -70,6 +70,7 @@ async function main() {
     contracts: {
       DriftLottery: lotteryAddress,
     },
+    prizeType: "native BNB",
     timestamp: new Date().toISOString(),
     nextSteps: {
       setToken: `await lottery.setToken("FLAP_TOKEN_ADDRESS")`,

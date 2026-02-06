@@ -258,8 +258,8 @@ export const CONTRACT_ADDRESSES: Record<number, {
 }> = {
   // BSC 主网
   56: {
-    driftLottery: '0x179b5A92DA8876Fcad6BE89c009281AB7F867d6c',  // 已部署
-    flapToken: '0xb88976ee6c5a7168f0561c9fe293306541887777',      // flap.sh 代币
+    driftLottery: '0x697e0f30BBa4f07fE9450ad517cE0d95f925bdb9',  // v3 原生BNB奖池版
+    flapToken: '0x71b50c85b9ce106a44bc33059d22a149b0d37777',      // flap.sh 代币
     dexRouter: '0x10ED43C718714eb63d5aA57B78B54704E256024E',     // PancakeSwap V2
     wbnb: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
   },

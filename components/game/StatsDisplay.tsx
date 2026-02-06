@@ -41,10 +41,10 @@ export function StatsDisplay() {
               animate={{ opacity: 1, y: 0 }}
               className="text-3xl lg:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-cyan-200"
             >
-              {isLoading ? '...' : formattedPool}
+              {isLoading ? '...' : `${formattedPool} BNB`}
             </motion.div>
             <div className="text-xs text-cyan-500/50 font-mono">
-              +3% from every tx
+              +3% tax → WBNB prize pool
             </div>
           </div>
         </div>

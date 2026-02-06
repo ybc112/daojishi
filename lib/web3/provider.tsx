@@ -30,12 +30,12 @@ const connectors = connectorsForWallets(
   }
 )
 
-// 使用 createConfig + 直连 BSC 公共 RPC（绕过 RainbowKit 的代理）
+// 使用 createConfig + 直连 BSC 公共 RPC（多节点 fallback，避免单点故障）
 const config = createConfig({
   connectors,
   chains: [bsc, bscTestnet],
   transports: {
-    [bsc.id]: http('https://bsc-dataseed1.binance.org'),
+    [bsc.id]: http('https://bsc.publicnode.com', { timeout: 10000 }),
     [bscTestnet.id]: http('https://data-seed-prebsc-1-s1.binance.org:8545'),
   },
   ssr: true,

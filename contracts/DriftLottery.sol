@@ -6,25 +6,27 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
- * @title DriftLottery
+ * @title DriftLottery v3
  * @notice 独立抽奖引擎合约（配合 flap.sh 发射的代币使用）
  *
  * @dev 架构说明：
- *      代币由 flap.sh 创建，设置 3% 税率，100% 税收发送到本合约地址。
- *      本合约仅负责抽奖逻辑，不包含 ERC20 功能。
+ *      代币由 flap.sh 创建，设置 3% 税率。
+ *      flap.sh 的 taxSplitter 会将税收换成 BNB 发送到本合约。
+ *      本合约用 原生 BNB 作为奖池资产，用 flap.sh 代币持仓检查参与资格。
  *
- *      税收分配：80% 进奖池，20% 营销
+ *      税收（BNB）分配：80% 进奖池，20% 营销
  *      授权 Keeper 监听 DEX 买卖事件并调用 reportTrade
  *      买单: 倒计时 -1分钟 + 爆率 +0.2%
  *      卖单: 倒计时 +1分钟 + 爆率归零
  *      倒计时归零 → 触发开奖（blockhash 随机 + 延迟确认）
+ *      中奖者获得 BNB 奖金
  */
 contract DriftLottery is Ownable, ReentrancyGuard {
 
     // ============ 常量 ============
     uint256 public constant POOL_SHARE = 80;                     // 80% 进奖池
     uint256 public constant MARKETING_SHARE = 20;                // 20% 营销
-    uint256 public constant MIN_HOLDING = 500_000 * 10**18;      // 参与抽奖最低持币
+    uint256 public constant MIN_HOLDING = 500_000 * 10**18;      // 参与抽奖最低持币（flap 代币）
 
     uint256 public constant INITIAL_COUNTDOWN = 100 minutes;     // 初始倒计时
     uint256 public constant MAX_COUNTDOWN = 200 minutes;         // 最大倒计时
@@ -43,20 +45,20 @@ contract DriftLottery is Ownable, ReentrancyGuard {
     uint256 public constant DRAW_DELAY = 2;                      // 开奖延迟区块数
 
     // ============ 配置 ============
-    IERC20 public token;                                         // flap.sh 代币地址
+    IERC20 public token;                                         // flap.sh 代币（用于持仓检查）
     address public keeper;                                       // 授权 Keeper
     address public marketingWallet;                              // 营销钱包
 
-    // ============ 抽奖状态 ============
+    // ============ 抽奖状态（BNB 计价） ============
     uint256 public currentRound = 1;
     uint256 public countdownEndTime;
-    uint256 public prizePool;                                    // 当前奖池
-    uint256 public rolloverPool;                                 // 滚存奖池
-    uint256 public marketingPool;                                // 可提取营销资金
+    uint256 public prizePool;                                    // 当前奖池（BNB）
+    uint256 public rolloverPool;                                 // 滚存奖池（BNB）
+    uint256 public marketingPool;                                // 可提取营销资金（BNB）
 
     // ============ 开奖状态（commit-reveal） ============
     bool public isDrawing;
-    uint256 public drawBlock;                                    // 触发开奖的区块号
+    uint256 public drawBlock;
 
     // ============ 参与者追踪 ============
     address[] public currentParticipants;
@@ -86,7 +88,7 @@ contract DriftLottery is Ownable, ReentrancyGuard {
     event TradeReported(address indexed user, bool isBuy, uint256 amount);
     event CountdownUpdated(uint256 newEndTime, int256 change);
     event RateUpdated(address indexed user, uint256 newRate);
-    event TaxSynced(uint256 newTax, uint256 poolShare, uint256 marketingShare);
+    event TaxReceived(uint256 amount, uint256 poolShare, uint256 marketingShare);
     event DrawTriggered(uint256 indexed round, uint256 prizePool);
     event DrawExecuted(uint256 indexed round);
     event PrizeAwarded(uint256 indexed round, address indexed winner, uint256 amount, uint8 prizeType);
@@ -107,6 +109,20 @@ contract DriftLottery is Ownable, ReentrancyGuard {
         countdownEndTime = block.timestamp + INITIAL_COUNTDOWN;
     }
 
+    // ============ 接收 BNB（税收入口） ============
+    // flap.sh taxSplitter 会把税收换成 BNB 发到这里
+    receive() external payable {
+        if (msg.value > 0) {
+            uint256 poolShare = (msg.value * POOL_SHARE) / 100;
+            uint256 mktShare = msg.value - poolShare;
+
+            prizePool += poolShare;
+            marketingPool += mktShare;
+
+            emit TaxReceived(msg.value, poolShare, mktShare);
+        }
+    }
+
     // ============ 管理配置 ============
 
     function setToken(address token_) external onlyOwner {
@@ -123,45 +139,8 @@ contract DriftLottery is Ownable, ReentrancyGuard {
         marketingWallet = wallet_;
     }
 
-    // ============ 税收同步 ============
-
-    /**
-     * @notice 同步 flap.sh 发来的税收代币，按 80/20 拆分
-     * @dev 每次有新代币到账，自动拆分进奖池和营销池
-     */
-    function _syncTax() internal {
-        if (address(token) == address(0)) return;
-
-        uint256 balance = token.balanceOf(address(this));
-        uint256 accounted = prizePool + rolloverPool + marketingPool;
-
-        if (balance > accounted) {
-            uint256 newTax = balance - accounted;
-            uint256 poolShare = (newTax * POOL_SHARE) / 100;
-            uint256 mktShare = newTax - poolShare;
-
-            prizePool += poolShare;
-            marketingPool += mktShare;
-
-            emit TaxSynced(newTax, poolShare, mktShare);
-        }
-    }
-
-    /**
-     * @notice 手动触发税收同步（任何人可调用）
-     */
-    function syncTax() external {
-        _syncTax();
-    }
-
     // ============ 核心：交易报告 ============
 
-    /**
-     * @notice Keeper 报告一笔 DEX 交易
-     * @param trader 交易者地址
-     * @param isBuy true=买入 false=卖出
-     * @param amount 交易代币数量
-     */
     function reportTrade(
         address trader,
         bool isBuy,
@@ -170,16 +149,12 @@ contract DriftLottery is Ownable, ReentrancyGuard {
         require(!isDrawing, "Drawing in progress");
         require(trader != address(0), "Invalid trader");
 
-        // 同步新到账的税收
-        _syncTax();
-
         // 检查倒计时是否已到期
         if (block.timestamp >= countdownEndTime) {
             if (currentParticipants.length > 0) {
                 _triggerDraw();
                 return;
             } else {
-                // 无参与者，自动重置倒计时（防止死锁）
                 countdownEndTime = block.timestamp + INITIAL_COUNTDOWN;
                 emit CountdownReset(countdownEndTime);
             }
@@ -195,17 +170,12 @@ contract DriftLottery is Ownable, ReentrancyGuard {
         }
 
         if (isValid) {
-            // 添加参与者
             _addParticipant(trader);
-
-            // 更新倒计时
             _updateCountdown(trader, isBuy);
 
-            // 更新爆率
             if (isBuy) {
                 _updateRate(trader);
             } else {
-                // 卖单惩罚：爆率归零
                 userBonusRate[trader] = 0;
                 emit RateUpdated(trader, BASE_RATE);
             }
@@ -229,7 +199,6 @@ contract DriftLottery is Ownable, ReentrancyGuard {
     function _updateCountdown(address trader, bool isBuy) internal {
         int256 change;
 
-        // 5分钟无交易重置连续买单计数
         if (block.timestamp - lastBuyTime[trader] > 5 minutes) {
             consecutiveBuys[trader] = 0;
         }
@@ -244,7 +213,6 @@ contract DriftLottery is Ownable, ReentrancyGuard {
 
         lastBuyTime[trader] = block.timestamp;
 
-        // 应用变化
         if (change < 0) {
             uint256 decrease = uint256(-change);
             if (countdownEndTime > block.timestamp + decrease) {
@@ -262,9 +230,6 @@ contract DriftLottery is Ownable, ReentrancyGuard {
         emit CountdownUpdated(countdownEndTime, change);
     }
 
-    /**
-     * @notice 买单衰减系数（指数衰减：100%, 50%, 25%, 12.5%...）
-     */
     function _calculateBuyDecay(address trader) internal view returns (uint256) {
         uint256 consecutive = consecutiveBuys[trader];
         if (consecutive == 0) return 100;
@@ -300,11 +265,8 @@ contract DriftLottery is Ownable, ReentrancyGuard {
         emit RateUpdated(trader, getUserRate(trader));
     }
 
-    // ============ 开奖逻辑（Commit-Reveal） ============
+    // ============ 开奖逻辑 ============
 
-    /**
-     * @notice 触发开奖（记录区块号，等待延迟后执行）
-     */
     function _triggerDraw() internal {
         require(!isDrawing, "Already drawing");
         require(currentParticipants.length > 0, "No participants");
@@ -315,75 +277,55 @@ contract DriftLottery is Ownable, ReentrancyGuard {
         emit DrawTriggered(currentRound, prizePool + rolloverPool);
     }
 
-    /**
-     * @notice 手动触发开奖（倒计时到期时任何人可调用）
-     */
     function triggerDraw() external {
         require(!isDrawing, "Already drawing");
         require(block.timestamp >= countdownEndTime, "Countdown not ended");
         require(currentParticipants.length > 0, "No participants");
 
-        _syncTax();
         _triggerDraw();
     }
 
-    /**
-     * @notice 执行开奖（在触发后等待 DRAW_DELAY 个区块）
-     * @dev 使用 blockhash 作为随机源，任何人可调用
-     */
     function executeDraw() external nonReentrant {
         require(isDrawing, "Not in drawing state");
         require(block.number > drawBlock + DRAW_DELAY, "Wait for block confirmation");
 
-        // 获取随机种子
         bytes32 blockHash = blockhash(drawBlock + 1);
         require(blockHash != bytes32(0), "Block hash expired, re-trigger needed");
 
         uint256 seed = uint256(blockHash);
 
-        // 同步最新税收
-        _syncTax();
-
-        // 计算奖项
+        // 计算奖项（BNB）
         uint256 totalPool = prizePool + rolloverPool;
         uint256 grandPrize = (totalPool * GRAND_PRIZE_SHARE) / 100;
         uint256 smallPrize = (totalPool * SMALL_PRIZE_SHARE) / 100;
         uint256 consolation = (totalPool * CONSOLATION_SHARE) / 100;
         uint256 rollover = (totalPool * ROLLOVER_SHARE) / 100;
 
-        // 筛选合格参与者
+        // 筛选合格参与者（检查 flap.sh 代币持仓）
         address[] memory eligible = _getEligibleParticipants();
 
         if (eligible.length > 0) {
-            // 大奖
             address grandWinner = _selectWinner(eligible, seed);
             if (grandWinner != address(0)) {
                 _transferPrize(grandWinner, grandPrize, 1);
             }
 
-            // 小奖（用不同种子）
             address smallWinner = _selectWinner(eligible, uint256(keccak256(abi.encode(seed, 1))));
             if (smallWinner != address(0) && smallWinner != grandWinner) {
                 _transferPrize(smallWinner, smallPrize, 2);
             }
 
-            // 阳光普照
             _distributeConsolation(eligible, grandWinner, smallWinner, consolation);
         }
 
         emit DrawExecuted(currentRound);
-
-        // 重置周期
         _resetRound(rollover);
     }
 
-    /**
-     * @notice 获取持币达标的参与者
-     */
     function _getEligibleParticipants() internal view returns (address[] memory) {
         uint256 count = 0;
         for (uint256 i = 0; i < currentParticipants.length; i++) {
-            if (token.balanceOf(currentParticipants[i]) >= MIN_HOLDING) {
+            if (address(token) == address(0) || token.balanceOf(currentParticipants[i]) >= MIN_HOLDING) {
                 count++;
             }
         }
@@ -391,7 +333,7 @@ contract DriftLottery is Ownable, ReentrancyGuard {
         address[] memory eligible = new address[](count);
         uint256 idx = 0;
         for (uint256 i = 0; i < currentParticipants.length; i++) {
-            if (token.balanceOf(currentParticipants[i]) >= MIN_HOLDING) {
+            if (address(token) == address(0) || token.balanceOf(currentParticipants[i]) >= MIN_HOLDING) {
                 eligible[idx] = currentParticipants[i];
                 idx++;
             }
@@ -399,9 +341,6 @@ contract DriftLottery is Ownable, ReentrancyGuard {
         return eligible;
     }
 
-    /**
-     * @notice 根据爆率加权随机选择中奖者
-     */
     function _selectWinner(
         address[] memory participants,
         uint256 randomSeed
@@ -432,12 +371,13 @@ contract DriftLottery is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice 转账奖金
+     * @notice 转账 BNB 奖金
      */
     function _transferPrize(address winner, uint256 amount, uint8 prizeType) internal {
         if (winner == address(0) || amount == 0) return;
 
-        token.transfer(winner, amount);
+        (bool success, ) = payable(winner).call{value: amount}("");
+        require(success, "BNB transfer failed");
 
         winHistory.push(WinRecord({
             round: currentRound,
@@ -449,9 +389,6 @@ contract DriftLottery is Ownable, ReentrancyGuard {
         emit PrizeAwarded(currentRound, winner, amount, prizeType);
     }
 
-    /**
-     * @notice 分配阳光普照奖
-     */
     function _distributeConsolation(
         address[] memory participants,
         address grandWinner,
@@ -475,9 +412,6 @@ contract DriftLottery is Ownable, ReentrancyGuard {
         }
     }
 
-    /**
-     * @notice 重置周期
-     */
     function _resetRound(uint256 rollover) internal {
         for (uint256 i = 0; i < currentParticipants.length; i++) {
             address p = currentParticipants[i];
@@ -535,12 +469,13 @@ contract DriftLottery is Ownable, ReentrancyGuard {
         return records;
     }
 
-    // ============ 营销资金提取 ============
+    // ============ 营销资金提取（BNB） ============
 
     function withdrawMarketing(uint256 amount) external onlyOwner nonReentrant {
         require(amount <= marketingPool, "Exceeds marketing pool");
         marketingPool -= amount;
-        token.transfer(marketingWallet, amount);
+        (bool success, ) = payable(marketingWallet).call{value: amount}("");
+        require(success, "BNB transfer failed");
         emit MarketingWithdrawn(marketingWallet, amount);
     }
 
@@ -548,23 +483,30 @@ contract DriftLottery is Ownable, ReentrancyGuard {
         uint256 amount = marketingPool;
         require(amount > 0, "Nothing to withdraw");
         marketingPool = 0;
-        token.transfer(marketingWallet, amount);
+        (bool success, ) = payable(marketingWallet).call{value: amount}("");
+        require(success, "BNB transfer failed");
         emit MarketingWithdrawn(marketingWallet, amount);
+    }
+
+    // ============ WBNB 兼容：如果收到 WBNB 可以手动转换 ============
+
+    function unwrapWBNB(address wbnb) external onlyOwner {
+        uint256 balance = IERC20(wbnb).balanceOf(address(this));
+        if (balance > 0) {
+            // 调用 WBNB 的 withdraw 方法把 WBNB 转成 BNB
+            (bool success, ) = wbnb.call(abi.encodeWithSignature("withdraw(uint256)", balance));
+            require(success, "WBNB unwrap failed");
+            // unwrap 后的 BNB 通过 receive() 自动入账
+        }
     }
 
     // ============ 管理函数 ============
 
-    /**
-     * @notice 重置倒计时（仅 Owner）
-     * @dev 用于合约部署后还没准备好开始时，或者倒计时意外归零时
-     */
     function resetCountdown() external onlyOwner {
         require(!isDrawing, "Drawing in progress");
         countdownEndTime = block.timestamp + INITIAL_COUNTDOWN;
         emit CountdownReset(countdownEndTime);
     }
-
-    // ============ 紧急函数 ============
 
     function emergencyResetDraw() external onlyOwner {
         isDrawing = false;
@@ -573,14 +515,12 @@ contract DriftLottery is Ownable, ReentrancyGuard {
 
     function emergencyWithdraw(address to) external onlyOwner nonReentrant {
         require(to != address(0), "Invalid address");
-        uint256 balance = token.balanceOf(address(this));
-        require(balance > 0, "No tokens");
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No BNB");
         prizePool = 0;
         rolloverPool = 0;
         marketingPool = 0;
-        token.transfer(to, balance);
+        (bool success, ) = payable(to).call{value: balance}("");
+        require(success, "BNB transfer failed");
     }
-
-    // ============ 接收 BNB（以防万一） ============
-    receive() external payable {}
 }
