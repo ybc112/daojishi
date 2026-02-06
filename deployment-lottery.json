@@ -1,10 +1,10 @@
 {
-  "network": "bscTestnet",
+  "network": "bsc",
   "deployer": "0x90fE5a6C1AAEDB2c8B62aeB4336C340Dc78F1081",
   "contracts": {
-    "DriftLottery": "0xB3d810a87Ec75B48e815021724D154FbdE7a7FE3"
+    "DriftLottery": "0x179b5A92DA8876Fcad6BE89c009281AB7F867d6c"
   },
-  "timestamp": "2026-02-06T08:50:52.571Z",
+  "timestamp": "2026-02-06T13:41:15.165Z",
   "nextSteps": {
     "setToken": "await lottery.setToken(\"FLAP_TOKEN_ADDRESS\")",
     "setKeeper": "await lottery.setKeeper(\"KEEPER_ADDRESS\")"

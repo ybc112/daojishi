@@ -258,9 +258,9 @@ export const CONTRACT_ADDRESSES: Record<number, {
 }> = {
   // BSC 主网
   56: {
-    driftLottery: '0x0000000000000000000000000000000000000000',  // 部署后填入
-    flapToken: '0x0000000000000000000000000000000000000000',     // flap.sh 创建后填入
-    dexRouter: '0x10ED43C718714eb63d5aA57B78B54704E256024E',    // PancakeSwap V2
+    driftLottery: '0x179b5A92DA8876Fcad6BE89c009281AB7F867d6c',  // 已部署
+    flapToken: '0xb88976ee6c5a7168f0561c9fe293306541887777',      // flap.sh 代币
+    dexRouter: '0x10ED43C718714eb63d5aA57B78B54704E256024E',     // PancakeSwap V2
     wbnb: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
   },
   // BSC 测试网

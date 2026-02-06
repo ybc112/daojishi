@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tree:*)",
+      "Bash(cat:*)",
+      "Bash(npx hardhat:*)",
+      "Bash(npm install:*)",
+      "Bash(gh auth:*)",
+      "Bash(git init:*)",
+      "Bash(git branch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nInitial commit: Drifting Lottery - Web3 抽奖协议\n\n- Next.js 16 前端应用\n- Solidity 智能合约 (DriftLottery)\n- Web3 集成 (Wagmi + RainbowKit)\n- 中英文多语言支持\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git remote add:*)",
+      "Bash(git push:*)",
+      "Bash(git commit:*)",
+      "Bash(node scripts/check-balances.js:*)",
+      "Bash(node -e \"\nconst { ethers } = require(''ethers'');\nconst provider = new ethers.JsonRpcProvider(''https://bsc-dataseed1.binance.org'');\nconst wallet = new ethers.Wallet(''0f517f79ee77c1f1481de07971d60307a148c8f43ce82dea3733c1178c090414'', provider);\nasync function main() {\n  console.log(''部署者地址:'', wallet.address);\n  const balance = await provider.getBalance(wallet.address);\n  console.log(''BNB 余额:'', ethers.formatEther(balance), ''BNB'');\n}\nmain();\n\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
