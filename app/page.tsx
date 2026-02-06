@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { DriftingBackground } from '@/components/game/Background'
 import { Timer } from '@/components/game/Timer'
 import { StatsDisplay } from '@/components/game/StatsDisplay'
@@ -10,8 +11,9 @@ import { Navbar } from '@/components/layout/Navbar'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { useGameStore } from '@/lib/store'
-import { useTradeEvents } from '@/lib/web3/hooks'
+import { useTradeEvents, useContractAddresses } from '@/lib/web3/hooks'
 import { content } from '@/lib/content'
+import { Copy, CheckCircle2, ExternalLink } from 'lucide-react'
 
 // Reusing Section component for the bottom part
 function Section({ title, icon: Icon, children, delay = 0, className }: any) {
@@ -45,12 +47,28 @@ function Section({ title, icon: Icon, children, delay = 0, className }: any) {
 
 import { Trophy, ShieldAlert, ChevronDown } from 'lucide-react'
 
+// 项目社交链接配置（部署后填入）
+const SOCIAL_LINKS = {
+  twitter: '', // 填入 Twitter 链接，如 https://x.com/yourproject
+  telegram: '', // 填入 Telegram 链接
+}
+
 export default function Home() {
   const { language } = useGameStore()
   const t_hero = content[language].hero
   const t_rules = content[language].rules
   const t_game = content[language].game
   const trades = useTradeEvents()
+  const { flapToken } = useContractAddresses()
+  const [caCopied, setCaCopied] = useState(false)
+
+  const isCASet = flapToken !== '0x0000000000000000000000000000000000000000'
+
+  const handleCopyCA = () => {
+    navigator.clipboard.writeText(flapToken)
+    setCaCopied(true)
+    setTimeout(() => setCaCopied(false), 2000)
+  }
 
   // 格式化时间差
   const formatTimeAgo = (timestamp: number) => {
@@ -103,6 +121,73 @@ export default function Home() {
                 <span className="text-white/80">{t_hero.subtitle_2}</span>
               </motion.p>
           </div>
+
+          {/* CA 地址 + 社交链接 */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="flex flex-col sm:flex-row items-center gap-3 mt-2"
+          >
+            {/* CA 地址条 */}
+            {isCASet && (
+              <button
+                onClick={handleCopyCA}
+                className="group flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 hover:border-cyan-500/30 backdrop-blur-md transition-all"
+              >
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                  {t_game.ca_label}
+                </span>
+                <span className="text-xs font-mono text-cyan-400 group-hover:text-cyan-300">
+                  {flapToken.slice(0, 6)}...{flapToken.slice(-4)}
+                </span>
+                {caCopied ? (
+                  <CheckCircle2 size={12} className="text-emerald-400" />
+                ) : (
+                  <Copy size={12} className="text-slate-500 group-hover:text-cyan-400" />
+                )}
+              </button>
+            )}
+
+            {/* BscScan 链接 */}
+            {isCASet && (
+              <a
+                href={`https://bscscan.com/token/${flapToken}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/5 border border-white/10 hover:border-yellow-500/30 text-xs text-slate-400 hover:text-yellow-400 transition-all"
+              >
+                <span className="font-bold">BscScan</span>
+                <ExternalLink size={10} />
+              </a>
+            )}
+
+            {/* Twitter */}
+            {SOCIAL_LINKS.twitter && (
+              <a
+                href={SOCIAL_LINKS.twitter}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/5 border border-white/10 hover:border-sky-500/30 text-xs text-slate-400 hover:text-sky-400 transition-all"
+              >
+                <svg viewBox="0 0 24 24" className="w-3 h-3 fill-current"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                <span className="font-bold">Twitter</span>
+              </a>
+            )}
+
+            {/* Telegram */}
+            {SOCIAL_LINKS.telegram && (
+              <a
+                href={SOCIAL_LINKS.telegram}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/5 border border-white/10 hover:border-blue-500/30 text-xs text-slate-400 hover:text-blue-400 transition-all"
+              >
+                <span className="font-bold">Telegram</span>
+                <ExternalLink size={10} />
+              </a>
+            )}
+          </motion.div>
         </header>
 
         {/* --- MAIN COCKPIT --- */}

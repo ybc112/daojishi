@@ -8,7 +8,7 @@ import '@rainbow-me/rainbowkit/styles.css'
 
 // 配置支持的链
 const config = getDefaultConfig({
-  appName: 'Drifting Lottery',
+  appName: 'Countdown Protocol',
   projectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_ID || 'demo',
   chains: [bsc, bscTestnet],
   ssr: true,

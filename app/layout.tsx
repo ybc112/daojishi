@@ -6,8 +6,8 @@ import { Web3Provider } from '@/lib/web3/provider'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: '漂流博弈 | Drifting Lottery',
-  description: 'Fair, Dynamic, Perpetual Lottery Protocol',
+  title: '倒计时协议 | Countdown Protocol',
+  description: 'The Perpetual Countdown Lottery Engine on BNB Chain',
 }
 
 export default function RootLayout({

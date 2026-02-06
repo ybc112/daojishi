@@ -39,7 +39,7 @@ export function Navbar() {
             <div className="w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.8)]" />
           </div>
           <span className="font-bold tracking-widest text-sm text-slate-200 group-hover:text-white transition-colors hidden sm:block">
-            DRIFT
+            COUNTDOWN
           </span>
         </Link>
 

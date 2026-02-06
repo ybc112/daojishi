@@ -8,7 +8,7 @@ export const content = {
     },
     hero: {
       tagline: "Mainnet Live v1.0",
-      title_prefix: "DRIFT",
+      title_prefix: "COUNTDOWN",
       title_suffix: "PROTOCOL",
       subtitle_1: "The perpetual countdown lottery engine.",
       subtitle_2: "Every transaction warps time.",
@@ -31,7 +31,10 @@ export const content = {
       live_status: "Live Status",
       players: "Players",
       round: "Round",
-      system_ok: "System Operational"
+      system_ok: "System Operational",
+      ca_label: "Contract Address",
+      ca_copy: "Copy",
+      ca_copied: "Copied!"
     },
     rules: {
       flywheel_title: "THE FLYWHEEL",
@@ -70,7 +73,7 @@ export const content = {
       ]
     },
     docs: {
-      title: "Drift Protocol Whitepaper",
+      title: "Countdown Protocol Whitepaper",
       sections: [
         {
           title: "1. Core Mechanism Summary",
@@ -108,7 +111,7 @@ export const content = {
     },
     hero: {
       tagline: "主网已上线 v1.0",
-      title_prefix: "漂流",
+      title_prefix: "倒计时",
       title_suffix: "协议",
       subtitle_1: "永续倒计时博弈引擎。",
       subtitle_2: "每一笔交易都在扭曲时间。",
@@ -131,7 +134,10 @@ export const content = {
       live_status: "运行状态",
       players: "参与人数",
       round: "轮次",
-      system_ok: "系统正常运行中"
+      system_ok: "系统正常运行中",
+      ca_label: "合约地址",
+      ca_copy: "复制",
+      ca_copied: "已复制!"
     },
     rules: {
       flywheel_title: "正向飞轮",
@@ -170,11 +176,11 @@ export const content = {
       ]
     },
     docs: {
-      title: "漂流协议白皮书",
+      title: "倒计时协议白皮书",
       sections: [
         {
           title: "一、核心机制总述",
-          content: "本机制以交易手续费驱动奖池、买卖行为博弈倒计时、爆率激励交易为核心，构建 “奖池增厚→买单增多→倒计时加速→开奖前置→参与意愿提升→交易规模扩大→手续费增加→奖池滚存 + 代币通缩→价格支撑” 的正向循环飞轮。\n\n每笔代币买卖交易统一收取 3% 手续费，全额注入抽奖奖池；初始倒计时 100 分钟，买单加速、卖单延缓，倒计时归 0 即开奖。"
+          content: "本机制以交易手续费驱动奖池、买卖行为博弈倒计时、爆率激励交易为核心，构建「奖池增厚→买单增多→倒计时加速→开奖前置→参与意愿提升→交易规模扩大→手续费增加→奖池滚存 + 代币通缩→价格支撑」的正向循环飞轮。\n\n每笔代币买卖交易统一收取 3% 手续费，全额注入抽奖奖池；初始倒计时 100 分钟，买单加速、卖单延缓，倒计时归 0 即开奖。"
         },
         {
           title: "二、动态倒计时博弈机制",
