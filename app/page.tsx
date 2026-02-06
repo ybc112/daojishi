@@ -47,10 +47,10 @@ function Section({ title, icon: Icon, children, delay = 0, className }: any) {
 
 import { Trophy, ShieldAlert, ChevronDown } from 'lucide-react'
 
-// 项目社交链接配置（部署后填入）
+// 项目社交链接配置
 const SOCIAL_LINKS = {
-  twitter: '', // 填入 Twitter 链接，如 https://x.com/yourproject
-  telegram: '', // 填入 Telegram 链接
+  twitter: 'https://x.com/daojishibsc',
+  telegram: 'https://t.me/daojishi7',
 }
 
 export default function Home() {
