@@ -92,6 +92,7 @@ contract DriftLottery is Ownable, ReentrancyGuard {
     event PrizeAwarded(uint256 indexed round, address indexed winner, uint256 amount, uint8 prizeType);
     event RoundReset(uint256 newRound, uint256 rollover);
     event MarketingWithdrawn(address indexed to, uint256 amount);
+    event CountdownReset(uint256 newEndTime);
 
     // ============ 修饰符 ============
     modifier onlyKeeper() {
@@ -174,8 +175,14 @@ contract DriftLottery is Ownable, ReentrancyGuard {
 
         // 检查倒计时是否已到期
         if (block.timestamp >= countdownEndTime) {
-            _triggerDraw();
-            return;
+            if (currentParticipants.length > 0) {
+                _triggerDraw();
+                return;
+            } else {
+                // 无参与者，自动重置倒计时（防止死锁）
+                countdownEndTime = block.timestamp + INITIAL_COUNTDOWN;
+                emit CountdownReset(countdownEndTime);
+            }
         }
 
         // 防刷：5分钟合并窗口
@@ -543,6 +550,18 @@ contract DriftLottery is Ownable, ReentrancyGuard {
         marketingPool = 0;
         token.transfer(marketingWallet, amount);
         emit MarketingWithdrawn(marketingWallet, amount);
+    }
+
+    // ============ 管理函数 ============
+
+    /**
+     * @notice 重置倒计时（仅 Owner）
+     * @dev 用于合约部署后还没准备好开始时，或者倒计时意外归零时
+     */
+    function resetCountdown() external onlyOwner {
+        require(!isDrawing, "Drawing in progress");
+        countdownEndTime = block.timestamp + INITIAL_COUNTDOWN;
+        emit CountdownReset(countdownEndTime);
     }
 
     // ============ 紧急函数 ============

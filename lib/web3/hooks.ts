@@ -24,8 +24,11 @@ function useCurrentChain() {
 export function useGameData() {
   const { driftLottery } = useContractAddresses()
 
-  const { data, isLoading, refetch } = useReadContracts({
-    contracts: [
+  // 检查合约地址是否有效（非零地址）
+  const isValidAddress = driftLottery !== '0x0000000000000000000000000000000000000000'
+
+  const { data, isLoading, isError, refetch } = useReadContracts({
+    contracts: isValidAddress ? [
       {
         address: driftLottery,
         abi: DRIFT_LOTTERY_ABI,
@@ -51,15 +54,25 @@ export function useGameData() {
         abi: DRIFT_LOTTERY_ABI,
         functionName: 'isDrawing',
       },
-    ],
+    ] : [],
   })
 
   // 计算剩余时间
-  const [timeLeft, setTimeLeft] = useState(0)
-  const countdownEndTime = data?.[0]?.result as bigint | undefined
+  const [timeLeft, setTimeLeft] = useState<number | null>(null)  // null = 加载中
+  const countdownEndTime = data?.[0]?.status === 'success' ? (data[0].result as bigint) : undefined
 
   useEffect(() => {
-    if (!countdownEndTime) return
+    // 没有有效数据时保持 null（加载中状态）
+    if (countdownEndTime === undefined) {
+      setTimeLeft(null)
+      return
+    }
+
+    // countdownEndTime 是 0n 表示异常，也保持加载中
+    if (countdownEndTime === 0n) {
+      setTimeLeft(null)
+      return
+    }
 
     const updateTime = () => {
       const now = BigInt(Math.floor(Date.now() / 1000))
@@ -78,13 +91,29 @@ export function useGameData() {
     return () => clearInterval(interval)
   }, [refetch])
 
+  // Debug: 在控制台输出合约读取状态（方便排查问题）
+  useEffect(() => {
+    if (data) {
+      console.log('[GameData] Contract reads:', data.map((d, i) => ({
+        index: i,
+        status: d.status,
+        result: d.status === 'success' ? d.result?.toString() : undefined,
+        error: d.status === 'failure' ? (d.error as any)?.message : undefined,
+      })))
+    }
+    if (isError) {
+      console.error('[GameData] useReadContracts error')
+    }
+  }, [data, isError])
+
   return {
     timeLeft,
-    prizePool: data?.[1]?.result ? Number(formatEther(data[1].result as bigint)) : 0,
-    participants: data?.[2]?.result ? Number(data[2].result) : 0,
-    round: data?.[3]?.result ? Number(data[3].result) : 1,
-    isDrawing: (data?.[4]?.result as boolean) || false,
-    isLoading,
+    prizePool: data?.[1]?.status === 'success' ? Number(formatEther(data[1].result as bigint)) : 0,
+    participants: data?.[2]?.status === 'success' ? Number(data[2].result) : 0,
+    round: data?.[3]?.status === 'success' ? Number(data[3].result) : 1,
+    isDrawing: data?.[4]?.status === 'success' ? (data[4].result as boolean) : false,
+    isLoading: isLoading || timeLeft === null,
+    isContractConnected: isValidAddress && data?.[0]?.status === 'success',
     refetch,
   }
 }
